@@ -1,0 +1,30 @@
+# Core environment (osx-arm64 and linux-64). install.sh creates it as ./env and adds platform extras:
+#   Linux:          plink2, admixture, bioconductor-hibag go into ./env too (./env-x86 becomes a symlink to ./env)
+#   Apple Silicon:  plink2 and admixture have no arm64 build -> ./env-x86 (environment-x86.yml, under Rosetta);
+#                   HIBAG goes into ./r-lib for the system R (or conda r-base if no system R)
+# Versions pinned to the ones the published demo was produced with (2026-09-28).
+name: genome-decoded
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - python=3.12
+  - pandas=2.3
+  - numpy=2.5
+  - scipy=1.18
+  - matplotlib=3.11
+  - pysam=0.24
+  - zstd=1.5
+  - plink=1.90b7.7
+  - bcftools=1.24
+  - htslib=1.24
+  - beagle=5.5_27Feb25.75f
+  - pharmcat3=3.1.1
+  - crossmap=0.7.4
+  - openjdk=21
+  - snakemake=9.27
+  - snakemake-executor-plugin-slurm=2.8
+  - pytest
+  - pip
+  - pip:
+      - git+https://github.com/23andMe/yhaplo.git@f72f88f2818aebd049c29d2ca8fc2f30c3003b17

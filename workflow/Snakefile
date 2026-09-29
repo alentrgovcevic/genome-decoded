@@ -1,0 +1,346 @@
+# genome-decoded workflow.
+#   Local:  env/bin/snakemake -s workflow/Snakefile --cores 8
+#   SLURM:  env/bin/snakemake -s workflow/Snakefile --profile profiles/slurm
+#   Own samples: --configfile config/local.yaml   (same keys as config/config.yaml)
+#
+# Layout: every sample runs in runs/<sample>/ (data/, results/, run_config.json) with symlinks to the shared
+# env/, env-x86/, r-lib/, scripts/ and the reference directory. Shared reference derivatives (the 1000G panel
+# minus `exclude_from_reference`, Beagle panels) are built once by their own rules, before any sample needs them.
+import json
+from pathlib import Path
+
+configfile: "config/config.yaml"
+
+REPO = Path(workflow.basedir).parent.resolve()
+REF = Path(config["reference_dir"])
+REF = REF if REF.is_absolute() else (REPO / REF)
+RUNS = Path(config.get("runs_dir", "runs"))
+RUNS = RUNS if RUNS.is_absolute() else (REPO / RUNS)
+SHARED = RUNS / "_shared"
+# `run_samples` limits a run to some samples (config files are merged, so the demo entry may still be present).
+SAMPLES = config.get("run_samples") or list(config["samples"])
+AUTOS = [str(c) for c in range(1, 23)]
+LINKS = {"env": REPO / "env", "env-x86": REPO / "env-x86", "r-lib": REPO / "r-lib", "scripts": REPO / "scripts", "reference": REF}
+
+
+def raw_path(s):
+    p = Path(config["samples"][s]["raw"])
+    return str(p if p.is_absolute() else REPO / p)
+
+
+def link_dir(d: Path):
+    d.mkdir(parents=True, exist_ok=True)
+    for name, target in LINKS.items():
+        link = d / name
+        if target.exists() and not link.exists():
+            link.symlink_to(target)
+
+
+def R(s, path):
+    return str(RUNS / s / path)
+
+
+wildcard_constraints:
+    sample="[A-Za-z0-9_.-]+",
+    c="[0-9]+|X",
+
+
+rule all:
+    input:
+        expand(str(RUNS / "{sample}" / "results" / "report.html"), sample=SAMPLES),
+
+
+# ---------------------------------------------------------------- shared reference ----------
+
+rule panel:
+    input:
+        str(REF / "1kg" / "all_phase3.psam"),
+    output:
+        str(REF / "panel" / "eur_seq.pgen"),
+        str(REF / "panel" / "eur_unrelated.keep"),
+    params:
+        exclude="\n".join(config.get("exclude_from_reference", [])),
+    resources:
+        mem_mb=16000,
+        runtime=120,
+    run:
+        link_dir(SHARED)
+        (REF / "panel").mkdir(parents=True, exist_ok=True)
+        ex = REF / "panel" / "exclude.txt"
+        new = params.exclude + ("\n" if params.exclude else "")
+        if not ex.exists() or ex.read_text() != new:
+            ex.write_text(new)
+        shell(f"cd {SHARED} && bash scripts/build_panel.sh")
+
+
+rule bref3:
+    input:
+        str(REF / "panel" / "eur_unrelated.keep"),
+    output:
+        str(REF / "beagle" / "{kind}" / "chr{c}.bref3"),
+    params:
+        kind=lambda w: "full" if w.kind == "ref" else "noeur",
+    resources:
+        mem_mb=16000,
+        runtime=120,
+    shell:
+        "cd {SHARED} && bash scripts/build_bref3.sh {params.kind} {wildcards.c}"
+
+
+# ---------------------------------------------------------------- per sample ----------------
+
+rule setup:
+    output:
+        str(RUNS / "{sample}" / "run_config.json"),
+    run:
+        s = wildcards.sample
+        link_dir(RUNS / s)
+        keys = ("pgs", "selected_markers", "ancestry", "hibag_model")
+        rc = {k: config[k] for k in keys}
+        rc["display_name"] = config["samples"][s].get("display_name", s)
+        rc["sample"] = s
+        Path(output[0]).write_text(json.dumps(rc, indent=1))
+
+
+rule qc:
+    input:
+        raw=lambda w: raw_path(w.sample),
+        rc=R("{sample}", "run_config.json"),
+    output:
+        R("{sample}", "data/genome_23andme.txt"),
+        R("{sample}", "results/qc.json"),
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/qc.py {input.raw}"
+
+
+rule plink:
+    input:
+        R("{sample}", "data/genome_23andme.txt"),
+    output:
+        R("{sample}", "data/genome.bed"),
+        R("{sample}", "data/genome.bim"),
+        R("{sample}", "data/genome.fam"),
+    shell:
+        """cd {RUNS}/{wildcards.sample}/data && ../env/bin/plink --23file genome_23andme.txt SELF SELF $(cat sex.txt) --make-bed --out genome_raw --silent \
+        && ../env/bin/plink --bfile genome_raw --split-x b37 no-fail --make-bed --out genome --silent"""
+
+
+rule roh:
+    input:
+        R("{sample}", "data/genome.bed"),
+    output:
+        R("{sample}", "results/roh.hom"),
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/plink --bfile data/genome --autosome --homozyg --out results/roh --silent"
+
+
+rule clinvar:
+    input:
+        R("{sample}", "data/genome.fam"),
+        str(REF / "variant_summary.txt.gz"),
+    output:
+        R("{sample}", "results/clinvar_hits.tsv"),
+        R("{sample}", "results/clinvar_summary.json"),
+        R("{sample}", "results/selected_markers.tsv"),
+    resources:
+        mem_mb=16000,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/clinvar.py"
+
+
+rule rare_hom:
+    input:
+        R("{sample}", "data/genome_23andme.txt"),
+        str(REF / "panel" / "eur_unrelated.keep"),
+    output:
+        R("{sample}", "results/qc_rare_hom.tsv"),
+        R("{sample}", "results/qc_rare_hom.json"),
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/qc_rare_hom.py"
+
+
+rule yhaplo:
+    input:
+        R("{sample}", "data/genome.fam"),
+    output:
+        touch(R("{sample}", "results/yhaplo/.done")),
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/y_haplogroup.py"
+
+
+rule ancestry:
+    input:
+        R("{sample}", "data/genome.bed"),
+        str(REF / "panel" / "eur_unrelated.keep"),
+    output:
+        R("{sample}", "results/ancestry/admixture_Q.tsv"),
+        R("{sample}", "data/anc/self.bim"),
+    threads: 8
+    resources:
+        mem_mb=16000,
+        runtime=240,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && bash scripts/ancestry.sh > data/ancestry.log 2>&1"
+
+
+rule aadr:
+    input:
+        R("{sample}", "data/anc/self.bim"),
+        str(REF / "aadr" / "v66.p1_HO.aadr.patch.PUB.geno"),
+    output:
+        R("{sample}", "results/aadr/proj_weur.sscore"),
+        R("{sample}", "results/aadr/proj_zoom.sscore"),
+    resources:
+        mem_mb=16000,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && bash scripts/aadr.sh > data/aadr.log 2>&1"
+
+
+rule membership:
+    input:
+        R("{sample}", "results/aadr/proj_weur.sscore"),
+        R("{sample}", "results/ancestry/admixture_Q.tsv"),
+    output:
+        R("{sample}", "results/membership/aadr_weur_pooled.json"),
+        R("{sample}", "results/membership/aadr_likelihood.json"),
+    resources:
+        mem_mb=16000,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/ancestry_membership.py && env/bin/python scripts/ancestry_likelihood.py"
+
+
+rule impute_chr:
+    input:
+        R("{sample}", "data/genome_23andme.txt"),
+        str(REF / "beagle" / "ref" / "chr{c}.bref3"),
+    output:
+        R("{sample}", "data/imputed/chr{c}.vcf.gz"),
+        R("{sample}", "data/imputed/target.chr{c}.vcf"),
+    wildcard_constraints:
+        c="[0-9]+",
+    threads: 8
+    resources:
+        mem_mb=20000,
+        runtime=120,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && bash scripts/impute.sh {wildcards.c} > data/imputed/impute.chr{wildcards.c}.log 2>&1"
+
+
+rule impute_x:
+    input:
+        R("{sample}", "data/genome.fam"),
+        str(REF / "beagle" / "ref" / "chrX.bref3"),
+        str(REF / "panel" / "eur_unrelated.keep"),
+    output:
+        R("{sample}", "data/imputed/chrX.vcf.gz"),
+    threads: 8
+    resources:
+        mem_mb=20000,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && mkdir -p data/imputed && bash scripts/impute_x.sh > data/imputed/impute.chrX.log 2>&1"
+
+
+rule refimp_chr:
+    input:
+        R("{sample}", "data/imputed/target.chr{c}.vcf"),
+        R("{sample}", "results/qc_rare_hom.tsv"),
+        str(REF / "beagle" / "ref_noeur" / "chr{c}.bref3"),
+    output:
+        R("{sample}", "data/refimp/chr{c}.vcf.gz"),
+    threads: 8
+    resources:
+        mem_mb=24000,
+        runtime=180,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && mkdir -p data/refimp && bash scripts/ref_impute.sh {wildcards.c} > data/refimp/refimp.chr{wildcards.c}.log 2>&1"
+
+
+rule benchmark:
+    input:
+        expand(R("{{sample}}", "data/refimp/chr{c}.vcf.gz"), c=AUTOS),
+    output:
+        R("{sample}", "results/impute_benchmark.json"),
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/impute_benchmark.py > results/impute_benchmark.log 2>&1"
+
+
+rule clinvar_imputed:
+    input:
+        expand(R("{{sample}}", "data/imputed/chr{c}.vcf.gz"), c=AUTOS + ["X"]),
+        R("{sample}", "results/clinvar_hits.tsv"),
+    output:
+        R("{sample}", "results/clinvar_imputed.tsv"),
+    resources:
+        mem_mb=16000,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/clinvar_imputed.py && env/bin/python scripts/clinvar_af.py"
+
+
+rule hla:
+    input:
+        R("{sample}", "data/genome.bed"),
+        str(REF / "hibag" / config["hibag_model"]),
+    output:
+        R("{sample}", "results/hla/hla_calls.tsv"),
+    shell:
+        """cd {RUNS}/{wildcards.sample} && mkdir -p data/hla \
+        && env-x86/bin/plink2 --pfile reference/panel/all_phase3 vzs --chr 6 --from-bp 25000000 --to-bp 35000000 \
+           --make-just-pvar cols= --out data/hla/kg_mhc --silent \
+        && env/bin/python scripts/fill_mhc_alleles.py \
+        && if [ -x env/bin/Rscript ] && env/bin/Rscript -e 'library(HIBAG)' >/dev/null 2>&1; then RS=env/bin/Rscript; \
+           else export R_LIBS_USER=$PWD/r-lib; RS=Rscript; fi \
+        && $RS scripts/hla.R {config[hibag_model]} > data/hla/hla.log 2>&1"""
+
+
+rule pharmcat:
+    input:
+        expand(R("{{sample}}", "data/imputed/chr{c}.vcf.gz"), c=AUTOS),
+        R("{sample}", "results/hla/hla_calls.tsv"),
+    output:
+        R("{sample}", "results/pharmcat/pharmcat.report.json"),
+    resources:
+        mem_mb=8000,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && bash scripts/pharmcat.sh > data/pharmcat.log 2>&1"
+
+
+rule traits:
+    input:
+        R("{sample}", "data/imputed/chr9.vcf.gz"),
+        R("{sample}", "data/imputed/chr11.vcf.gz"),
+    output:
+        R("{sample}", "results/traits.json"),
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/traits.py > /dev/null"
+
+
+rule pgs:
+    input:
+        expand(R("{{sample}}", "data/refimp/chr{c}.vcf.gz"), c=AUTOS),
+        str(REF / "panel" / "eur_seq.pgen"),
+    output:
+        R("{sample}", "results/pgs/pgs_summary.json"),
+    resources:
+        mem_mb=24000,
+        runtime=240,
+    shell:
+        "cd {RUNS}/{wildcards.sample} && mkdir -p results/pgs && env/bin/python scripts/pgs.py > results/pgs/pgs.log 2>&1"
+
+
+rule report:
+    input:
+        R("{sample}", "results/qc.json"),
+        R("{sample}", "results/roh.hom"),
+        R("{sample}", "results/clinvar_summary.json"),
+        R("{sample}", "results/qc_rare_hom.json"),
+        R("{sample}", "results/yhaplo/.done"),
+        R("{sample}", "results/membership/aadr_likelihood.json"),
+        R("{sample}", "results/impute_benchmark.json"),
+        R("{sample}", "results/clinvar_imputed.tsv"),
+        R("{sample}", "results/pharmcat/pharmcat.report.json"),
+        R("{sample}", "results/traits.json"),
+        R("{sample}", "results/pgs/pgs_summary.json"),
+    output:
+        R("{sample}", "results/report.html"),
+    shell:
+        "cd {RUNS}/{wildcards.sample} && env/bin/python scripts/report.py"

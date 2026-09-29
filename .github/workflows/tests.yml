@@ -1,0 +1,17 @@
+name: tests
+on: [push, pull_request]
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install "pandas==2.3.*" "numpy==2.*" "scipy==1.*" pyyaml pytest "snakemake==9.27.*"
+      - name: unit tests (synthetic data, no reference downloads)
+        run: python -m pytest -q tests
+      - name: shell scripts parse
+        run: for f in *.sh scripts/*.sh; do bash -n "$f"; done
+      - name: workflow parses (no reference data, so nothing runs)
+        run: snakemake -s workflow/Snakefile --list-rules

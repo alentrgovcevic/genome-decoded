@@ -1,0 +1,9 @@
+# Apple Silicon only: tools without an osx-arm64 build, installed as osx-64 and run under Rosetta.
+# install.sh: CONDA_SUBDIR=osx-64 mamba env create -p ./env-x86 -f environment-x86.yml
+name: genome-decoded-x86
+channels:
+  - conda-forge
+  - bioconda
+dependencies:
+  - plink2=2.0.0a.6.9
+  - admixture=1.3.0

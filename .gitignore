@@ -1,0 +1,57 @@
+# --- Genotype data, never tracked (raw exports, derived and imputed files, reports of real people) ---
+runs/
+*.vcf
+*.vcf.gz
+*.bcf
+*.csi
+*.tbi
+*.bed
+*.bim
+*.fam
+*.pgen
+*.pvar
+*.pvar.zst
+*.psam
+*.bref3
+*.raw
+*.hom
+*.log
+demo/*.csv
+demo/*.csv.gz
+demo/.NA12878/
+# Consumer raw files dropped into the repo by mistake
+*raw_dna*
+*genome_*.txt
+*23andme*.txt
+*AncestryDNA*.txt
+
+# --- Large shared data and local environments ---
+# no trailing slash: these may be symlinks (a dev checkout links them to another folder), and `dir/` never
+# matches a symlink
+/reference
+/env
+/env-x86
+/r-lib
+/runs
+.snakemake/
+.pytest_cache/
+__pycache__/
+
+# --- Local config for your own samples ---
+config/local.yaml
+
+# --- Owner-facing working notes (kept out of the public repo) ---
+CLAUDE.md
+LEARNING_LOG.md
+TECHNICAL_DEBT.md
+PLAN.md
+_next_session.md
+session_recap/
+*_git_changes.md
+Documentation/
+docs/commands.html
+
+.DS_Store
+__pycache__/
+.ruff_cache/
+.pytest_cache/

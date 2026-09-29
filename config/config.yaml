@@ -1,0 +1,49 @@
+# genome-decoded configuration. Copy to config/local.yaml (gitignored) for your own samples, or pass --configfile.
+
+# One entry per person. `raw` is the consumer export (MyHeritage, FTDNA, 23andMe or AncestryDNA; GRCh37).
+# Runs go to runs/<sample>/ ; everything under runs/ is gitignored.
+samples:
+  demo:
+    raw: demo/NA12878_GSA_myheritage.csv   # built by demo/make_demo.py from public 1000 Genomes data
+    display_name: "NA12878 (1000 Genomes / GIAB demo sample)"
+
+# Shared reference data (tens of GB), filled by ./download_refs.sh. Absolute or relative to the repo.
+reference_dir: reference
+
+# 1000 Genomes individuals removed from every reference panel (imputation, ancestry, PGS and frequency
+# references). Put the demo individual here, or anyone else whose data you analyse and who is in 1000G.
+exclude_from_reference: [NA12878]
+
+threads: 8
+
+# Polygenic scores (PGS Catalog IDs, GRCh37-harmonised files). Sex-specific lists are added by inferred sex.
+pgs:
+  both: [PGS000018, PGS000014, PGS000016, PGS000074]
+  male: [PGS000662]
+  female: [PGS000004]
+
+# Well-known markers reported whatever the genotype (ClinVar-annotated).
+selected_markers: [rs429358, rs7412, rs1800562, rs1799945, rs6025, rs1799963]
+
+hibag_model: InfiniumGlobal-European-HLA4-hg19.RData
+
+ancestry:
+  # Present-day Human Origins populations from AADR used as the West Eurasian reference (Reich-lab outlier
+  # labels such as -o, -QCremove, -Dup, _WGA are never used).
+  regions:
+    "Southeast Europe & Balkans": [Albanian, Bulgarian, Croatian, Croatian_Serb, Serbian_Serb, Montenegrin_Serb,
+                                   Bosnian_Serb, Greek, Romanian, Moldavian, Gagauz]
+    "Central Europe": [Hungarian, Czech]
+    "Eastern Europe": [Ukrainian, Ukrainian_North, Belarusian, Russian, Lithuanian, Estonian, Mordovian]
+    "Northern & Western Europe": [Finnish, Norwegian, Icelandic, English, Scottish, Orcadian, French, Basque,
+                                  Spanish, Spanish_North]
+    "Italy & Mediterranean": [Italian_North, Italian_Central, Italian_South, Sicilian, Sardinian, Maltese, Cypriot]
+    "Anatolia & Caucasus": [Turkish, Armenian, Georgian, Adygei, Jew_Ashkenazi]
+  # Groups the leave-one-out check can't tell apart are pooled for the membership probabilities.
+  pooled_groups:
+    "South Slavic": [Croatian, Croatian_Serb, Serbian_Serb, Montenegrin_Serb, Bosnian_Serb]
+    "East Slavic": [Ukrainian, Ukrainian_North, Belarusian, Russian]
+  # A regional zoom PCA (recomputed on these groups only). Pick the region that interests you.
+  zoom_name: "Northern and Western Europe"
+  zoom_populations: [Finnish, Norwegian, Icelandic, English, Scottish, Orcadian, French, Basque, Spanish,
+                     Spanish_North, Italian_North, Czech, Hungarian, Lithuanian, Estonian]

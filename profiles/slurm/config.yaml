@@ -1,0 +1,15 @@
+# Snakemake >= 8 profile for SLURM clusters (snakemake-executor-plugin-slurm, installed by install.sh).
+#   env/bin/snakemake -s workflow/Snakefile --profile profiles/slurm
+# Account: the plugin looks yours up with sacctmgr/sshare. To choose one (or a partition your cluster requires):
+#   ... --profile profiles/slurm --default-resources slurm_account=myproject slurm_partition=normal
+# Rules declare their own threads/mem_mb/runtime (workflow/Snakefile); these are the defaults for the rest.
+# Compute nodes need no internet: run download_refs.sh on a login node first.
+executor: slurm
+jobs: 40
+latency-wait: 120
+retries: 1
+rerun-incomplete: true
+printshellcmds: true
+default-resources:
+  mem_mb: 4000
+  runtime: 60

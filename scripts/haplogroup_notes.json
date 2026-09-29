@@ -1,0 +1,35 @@
+{
+  "_about": "Short, sourced notes shown in the Y section when a sample's derived SNPs include the key SNP. Add entries with a citation; never from memory. Quotes are verbatim from the cited paper's PMC full text.",
+  "notes": [
+    {
+      "clade": "R1b-M269",
+      "key_snp": "M269",
+      "text": "Within R1b-M269, the major S116 sub-clade \"shows a frequency peak in the upper Danube basin and Paris area with declining frequency toward Italy, Iberia, Southern France and British Isles\".",
+      "source": "Myres et al. 2011, Eur J Hum Genet 19:95, doi:10.1038/ejhg.2010.146 (quote checked 2026-09-29 against PMC3039512)"
+    },
+    {
+      "clade": "R1a-M417",
+      "key_snp": "M417",
+      "text": "\"The spatial frequency distributions of R1a sub-haplogroups conclusively indicate two major groups, one found primarily in Europe and the other confined to Central and South Asia\"; of 1693 European R1a-M417 samples, \"more than 96% were assigned to R1a-Z282\". The authors estimate the lineage split up \"rather recently, ∼5800 years ago (95% CI: 4800–6800)\".",
+      "source": "Underhill et al. 2015, Eur J Hum Genet 23:124, doi:10.1038/ejhg.2014.50 (quotes checked 2026-09-29 against PMC4266736)"
+    },
+    {
+      "clade": "I1-M253",
+      "key_snp": "M253",
+      "text": "Called I1a in the source (defined by M253): \"Subclade I1a accounts for most of Hg I in Scandinavia, with a rapidly decreasing frequency toward both the East European Plain and the Atlantic fringe\".",
+      "source": "Rootsi et al. 2004, Am J Hum Genet 75:128, doi:10.1086/422196 (quote checked 2026-09-29 against PMC1181996)"
+    },
+    {
+      "clade": "I2-M423",
+      "key_snp": "M423",
+      "text": "\"The I-M423 sub-clade is characterized by a frequency distribution with high Central Balkan values (>70% in Bosnia-Herzegovina) and decreasing frequencies moving from the southern Dinaric Alps to northern Croatia\"; its microsatellite variation \"dates to around 8000 years ago (Early Holocene)\".",
+      "source": "Battaglia et al. 2009, Eur J Hum Genet 17:820, doi:10.1038/ejhg.2008.249 (quotes checked 2026-09-29 against PMC2947100)"
+    },
+    {
+      "clade": "E-V13",
+      "key_snp": "V13",
+      "text": "Makes up about 85% of European E-M78 lineages, \"with a clinal pattern of frequency distribution from the southern Balkan peninsula (19.6%) to western Europe (2.5%)\"; the most recent common ancestor of European E-V13 lineages lived about 4.0–4.7 thousand years ago.",
+      "source": "Cruciani et al. 2007, Mol Biol Evol 24:1300 (quote and figures checked 2026-09-28)"
+    }
+  ]
+}
