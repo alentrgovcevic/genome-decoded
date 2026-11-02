@@ -588,9 +588,17 @@ def main() -> None:
     )
 
     anc_html, anc = build_sections(num)
+    from run_config import cfg, pipeline_commit
     from run_config import get as cfg_get
 
     display_name = cfg_get("display_name")
+    commit = pipeline_commit()
+    commit_setup = cfg().get("pipeline_commit_at_setup")
+    provenance = f"genome-decoded <code>{esc(commit)}</code>" + (
+        f" (run started at <code>{esc(commit_setup)}</code>)"
+        if commit_setup and commit_setup != commit
+        else ""
+    )
     longest = roh["KB"].max() / 1000 if len(roh) else 0.0
     if longest < 10:
         roh_bullet = (
@@ -664,7 +672,7 @@ def main() -> None:
     body = f"""
 <header>
   <h1>{esc(display_name)}: genome report</h1>
-  <p class="sub">{esc({"myheritage": "MyHeritage", "ftdna": "FTDNA", "23andme": "23andMe", "ancestrydna": "AncestryDNA"}.get(qc.get("input_format"), "Consumer"))} raw export (<code>{esc(qc["raw_file"])}</code>, Illumina GSA, GRCh37) · ClinVar <code>variant_summary.txt.gz</code> dated {clinvar_date()} · generated {date.today().isoformat()} on this Mac. No data left the machine.</p>
+  <p class="sub">{esc({"myheritage": "MyHeritage", "ftdna": "FTDNA", "23andme": "23andMe", "ancestrydna": "AncestryDNA"}.get(qc.get("input_format"), "Consumer"))} raw export (<code>{esc(qc["raw_file"])}</code>, Illumina GSA, GRCh37) · ClinVar <code>variant_summary.txt.gz</code> dated {clinvar_date()} · {provenance} · generated {date.today().isoformat()} on this Mac. No data left the machine.</p>
 </header>
 
 <aside class="caveat" role="note">

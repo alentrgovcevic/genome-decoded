@@ -7,7 +7,11 @@
 # env/, env-x86/, r-lib/, scripts/ and the reference directory. Shared reference derivatives (the 1000G panel
 # minus `exclude_from_reference`, Beagle panels) are built once by their own rules, before any sample needs them.
 import json
+import sys
 from pathlib import Path
+
+sys.path.insert(0, str(Path(workflow.basedir).parent / "scripts"))
+from run_config import pipeline_commit
 
 configfile: "config/config.yaml"
 
@@ -99,6 +103,7 @@ rule setup:
         rc = {k: config[k] for k in keys}
         rc["display_name"] = config["samples"][s].get("display_name", s)
         rc["sample"] = s
+        rc["pipeline_commit_at_setup"] = pipeline_commit(REPO)  # report.py stamps the commit again at report time
         Path(output[0]).write_text(json.dumps(rc, indent=1))
 
 

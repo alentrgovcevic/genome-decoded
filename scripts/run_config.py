@@ -5,8 +5,31 @@ Shell:   env/bin/python scripts/run_config.py <key.subkey>   prints a list one i
 """
 
 import json
+import subprocess
 import sys
 from pathlib import Path
+
+
+def pipeline_commit(repo: Path | None = None) -> str:
+    """genome-decoded's git commit (short), '+uncommitted' if tracked files differ from it; 'unknown' without git."""
+    repo = repo or Path(__file__).resolve().parent.parent
+    git = ["git", "-C", str(repo)]
+    try:
+        sha = subprocess.run(
+            git + ["rev-parse", "--short=12", "HEAD"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+        dirty = subprocess.run(
+            git + ["status", "--porcelain", "--untracked-files=no"],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+    except (OSError, subprocess.CalledProcessError):
+        return "unknown"
+    return sha + ("+uncommitted" if dirty else "")
 
 
 def cfg() -> dict:
@@ -34,6 +57,8 @@ def sex() -> str:
 
 if __name__ == "__main__":
     v = get(sys.argv[1])
-    if isinstance(v, dict):  # dict of lists (e.g. ancestry.regions): all items, flattened
+    if isinstance(
+        v, dict
+    ):  # dict of lists (e.g. ancestry.regions): all items, flattened
         v = [x for xs in v.values() for x in xs]
     print("\n".join(map(str, v)) if isinstance(v, list) else v)

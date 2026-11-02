@@ -8,6 +8,8 @@ about your genome ever leaves your machine.
 ➡️ **[See the report for the public demo sample](https://alentrgovcevic.github.io/genome-decoded/)**
 (NA12878, the 1000 Genomes / Genome in a Bottle reference sample, run exactly as you would run yourself).
 
+[<img src="docs/report_screenshot.png" width="760" alt="Top of the NA12878 demo report: caveat box, QC tiles and the short-version summary">](https://alentrgovcevic.github.io/genome-decoded/)
+
 > Not a medical test. A consumer array reads ~600,000 positions, and its calls for very rare variants are
 > mostly wrong: 16% were confirmed by sequencing for variants rarer than 1 in 100,000 (Weedon et al. 2021,
 > *BMJ* 372:n214). The report says so where it matters; confirm anything
